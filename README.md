@@ -2,7 +2,6 @@
 Title: Customer Support Email Automation System | Langchain/Langgraph Integration
 Description: Automate customer support emails with our system built using Langchain/Langgraph. Features include email categorization, query synthesis, draft email creation, and email verification.
 Keywords: Customer support automation, email automation, Langchain, Langgraph, AI email agents, Gmail API, Python email automation, email categorization, email verification, AI agents, AI tools
-Author: kaymen99
 -->
 
 # Customer Support Email Automation with AI Agents and RAG
@@ -19,28 +18,46 @@ In today's fast-paced environment, customers demand quick, accurate, and persona
 
 ### Email Inbox Management with AI Agents
 
-- Continuously monitors the agency's Gmail inbox
-- Categorizes emails into 'customer complaint,' 'product inquiry,' 'customer feedback,' or 'unrelated'
+- Continuously monitors the agency's Gmail and Outlook inbox
+- Categorizes emails into 'customer complaint', 'product inquiry', 'customer feedback', 'samsara related' or 'unrelated'
 - Automatically handles irrelevant emails to maintain efficiency
+- **Manual Email Check Buttons**: Users can manually check for new emails using the **"Check Gmail"** and **"Check Outlook"** buttons on the frontend dashboard. These buttons trigger email fetching and draft generation for new messages.
 
 ### AI Response Generation
 
 - Quickly drafts emails for customer complaints and feedback using Langgraph
-- Utilizes RAG techniques to answer product/service related questions accurately
+- Utilizes RAG techniques to answer product/service-related questions accurately
 - Creates personalized email content tailored to each customer's needs
+
+### Samsara Integration for Fleet Management
+
+- Extracts location, vehicle, and driver details from Samsara API
+- Automatically identifies fleet-related inquiries and fetches relevant data
+- Ensures accurate and up-to-date vehicle tracking and response generation for transport and logistics
 
 ### Quality Assurance with AI
 
 - Automatically checks email quality, formatting, and relevance
 - Ensures every response meets high standards before reaching the client
 
+## Frontend Dashboard
+
+The system includes a user-friendly **React.js frontend** that provides an intuitive interface for monitoring email activity. Key features include:
+
+- **Email Statistics Overview**: Displays total received emails, read/unread count, replied emails, and drafted responses.
+- **Email Accounts Panel**: Users can switch between connected email accounts (Gmail and Outlook) to monitor emails from different sources.
+- **Recent Emails Section**: Lists the most recent emails received.
+- **Search and Filter Options**: Users can search emails by sender and filter by time range.
+- **Manual Email Checking**: The **"Check Gmail"** and **"Check Outlook"** buttons allow users to manually fetch new emails and trigger the AI draft generation process.
+
 ## How It Works
 
-1. **Email Monitoring**: The system constantly checks for new emails in the agency's Gmail inbox using the Gmail API.
+1. **Email Monitoring**: The system constantly checks for new emails in the agency's Gmail/Outlook inbox using the Gmail API/Outlook credentials.
 2. **Email Categorization**: AI agents sort each email into predefined categories.
 3. **Response Generation**: 
    - For complaints or feedback: The system quickly drafts a tailored email response.
    - For service/product questions: The system uses RAG to retrieve accurate information from agency documents and generates a response.
+   - For Samsara-related emails: The system fetches the respective location, vehicle details, or driver details, ensuring accurate fleet tracking.
 4. **Quality Assurance**: Each draft email undergoes AI quality and formatting checks.
 5. **Sending**: Approved emails are sent to the client promptly, ensuring timely communication.
 
@@ -54,17 +71,20 @@ This is the detailed flow of the system:
 
 * Langchain & Langgraph: for developing AI agents workflow.
 * Langserve: simplify API development & deployment (using FastAPI).
-* Groq and Gemini APIs: for LLMs access.
+* Gemini APIs: for LLMs access.
 * Google Gmail API
+* Samsara API: for fleet and vehicle data integration
 
 ## How to Run
 
 ### Prerequisites
 
-- Python 3.7+
-- Groq api key
-- Google Gemini api key (for embeddings)
+- Python 3.8+
+- Node.js 16+
+- Google Gemini API key (for embeddings)
 - Gmail API credentials
+- Outlook API setup
+- Samsara API credentials
 - Necessary Python libraries (listed in `requirements.txt`)
 
 ### Setup
@@ -72,8 +92,8 @@ This is the detailed flow of the system:
 1. **Clone the repository:**
 
    ```sh
-   git clone https://github.com/kaymen99/langgraph-email-automation.git
-   cd langgraph-email-automation
+   git clone https://github.com/swarnavarsha1/gmail_outlook_automation.git
+   cd gmail_outlook_automation
    ```
 
 2. **Create and activate a virtual environment:**
@@ -83,59 +103,50 @@ This is the detailed flow of the system:
    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
    ```
 
-3. **Install the required packages:**
+3. **Backend setup:**
 
+Navigate to the backend directory
+   ```sh
+   cd backend-email-automation
+   ```
+Install dependencies
    ```sh
    pip install -r requirements.txt
    ```
-
-4. **Set up environment variables:**
-
-   Create a `.env` file in the root directory of the project and add your GMAIL address, we are using the Groq llama-3.1-70b model and the Google gemini embedding model so you must also get API keys to access them:
-
-   ```env
-   MY_EMAIL=your_email@gmail.com
-   GROQ_API_KEY=your_groq_api_key
-   GOOGLE_API_KEY=your_gemini_api_key
-   ```
-
-5. **Ensure Gmail API is enabled:**
-
-   Follow [this guide](https://developers.google.com/gmail/api/quickstart/python) to enable Gmail API and obtain your credentials.
-
-### Running the Application
-
-1. **Start the workflow:**
-
-   ```sh
-   python main.py
-   ```
-
-   The application will start checking for new emails, categorizing them, synthesizing queries, drafting responses, and verifying email quality.
-
-2. **Deploy as API:** you can deploy the workflow as an API using Langserve and FastAPI by running the command below:
-
+Start the backend server
    ```sh
    python deploy_api.py
    ```
 
-   The workflow api will be running on `localhost:8000`, you can consult the API docs on `/docs` and you can use the langsergve playground (on the route `/playground`) to test it out.
+4. **Frontend setup:**
 
+Navigate to the frontend directory
+   ```sh
+   cd frontend-email-automation
+   ```
+Install dependencies
+   ```sh
+   npm install
+   ```
+Start the frontend server
+   ```sh
+   npm run dev
+   ```
 
 ### Customization
 
-You can customize the behavior of each agent by modifying the corresponding methods in the `Nodes` class or the agents prompt `prompts` located in the `src` directory.
+You can customize the behavior of each agent by modifying the corresponding methods in the `Nodes` class or the agents' prompt `prompts` located in the `src` directory.
 
 You can also add your own agency data into the `data` folder, then you must create your own vector store by running (update first the data path):
 
 ```sh
 python create_index.py
 ```
+### Generating Draft Emails
 
-### Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request for any changes.
-
-### Contact
-
-If you have any questions or suggestions, feel free to contact me at `aymenMir1001@gmail.com`.
+You can generate draft emails from the frontend using "Check Gmail" and "Check Outlook" buttons. Alternatively, you can generate drafts from the backend using the following commands:
+```sh
+cd backend-email-automation
+python main.py --service gmail
+python main.py --service outlook
+```
