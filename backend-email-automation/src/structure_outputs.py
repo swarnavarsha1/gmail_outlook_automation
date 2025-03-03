@@ -63,3 +63,13 @@ class SamsaraQueryOutput(BaseModel):
         default_factory=dict,
         description="Any additional parameters for the query"
     )
+    
+    # Initialize with appropriate values for real-time and detailed location requests
+    def __init__(self, **data):
+        super().__init__(**data)
+        if self.query_type == SamsaraQueryType.vehicle_location:
+            # Check if we need to set real_time based on input data
+            if 'additional_info' in data and 'real_time' not in self.additional_info:
+                self.additional_info['real_time'] = data.get('real_time', False)
+            elif 'additional_info' not in data or not self.additional_info:
+                self.additional_info = {'real_time': False, 'include_address': True}

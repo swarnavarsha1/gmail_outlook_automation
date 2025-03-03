@@ -83,7 +83,7 @@ class Agents():
             samsara_query_prompt | 
             gemini.with_structured_output(SamsaraQueryOutput)
         )
-
+        
         samsara_response_prompt = PromptTemplate(
             template=GENERATE_SAMSARA_RESPONSE_PROMPT,
             input_variables=["original_query", "query_type", "samsara_data"]

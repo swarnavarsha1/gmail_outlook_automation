@@ -1,4 +1,5 @@
 from enum import Enum
+import traceback
 from colorama import Fore, Style
 from .agents import Agents
 import dns.resolver
@@ -322,12 +323,21 @@ class Nodes:
         query_result = self.agents.identify_samsara_query.invoke({"email": email_content})
         
         print(Fore.MAGENTA + f"Samsara query type: {query_result.query_type}" + Style.RESET_ALL)
+        
+        # Ensure all vehicle IDs are strings for consistent handling
+        identifiers = []
         if query_result.identifiers:
-            print(Fore.MAGENTA + f"Identifiers: {', '.join(query_result.identifiers)}" + Style.RESET_ALL)
+            identifiers = [str(id).strip() for id in query_result.identifiers]
+            print(Fore.MAGENTA + f"Identifiers: {', '.join(identifiers)}" + Style.RESET_ALL)
+        
+        # Debug the raw ID formats to help troubleshoot
+        if identifiers:
+            print(Fore.CYAN + f"Original identifiers: {query_result.identifiers}" + Style.RESET_ALL)
+            print(Fore.CYAN + f"Identifier types: {[type(id).__name__ for id in query_result.identifiers]}" + Style.RESET_ALL)
         
         return {
             "samsara_query_type": query_result.query_type,
-            "samsara_identifiers": query_result.identifiers,
+            "samsara_identifiers": identifiers,
             "samsara_additional_info": query_result.additional_info
         }
 
@@ -337,20 +347,45 @@ class Nodes:
         
         query_type = state["samsara_query_type"]
         identifiers = state["samsara_identifiers"]
+        additional_info = state.get("samsara_additional_info", {})
         samsara_data = ""
         
         try:
+            print(Fore.CYAN + f"Query type: {query_type}" + Style.RESET_ALL)
+            print(Fore.CYAN + f"Identifiers: {identifiers}" + Style.RESET_ALL)
+            print(Fore.CYAN + f"Additional info: {additional_info}" + Style.RESET_ALL)
+            
             if query_type == "vehicle_location":
-                location_data = await self.samsara_tools.get_vehicle_locations(identifiers if identifiers else None)
-                samsara_data = self.samsara_tools.format_location_for_email(location_data)
+                # Check if we need real-time feed data or standard location data
+                if additional_info.get("real_time", False):
+                    # Use the new location feed endpoint for real-time data
+                    print(Fore.CYAN + "Using real-time location feed endpoint" + Style.RESET_ALL)
+                    location_data = await self.samsara_tools.get_vehicle_locations_feed(
+                        identifiers if identifiers else None
+                    )
+                    # Format the data for email
+                    samsara_data = self.samsara_tools.format_location_feed_for_email(location_data)
+                else:
+                    # Use standard location endpoint
+                    print(Fore.CYAN + "Using standard location endpoint" + Style.RESET_ALL)
+                    location_data = await self.samsara_tools.get_vehicle_locations(
+                        identifiers if identifiers else None
+                    )
+                    # Format the data for email
+                    samsara_data = self.samsara_tools.format_location_for_email(location_data)
                 
             elif query_type == "vehicle_info":
                 if identifiers and len(identifiers) > 0:
-                    vehicle_info = await self.samsara_tools.get_vehicle_info(identifiers[0])
-                    samsara_data = f"Vehicle Information:\n{vehicle_info}"
+                    # Get specific vehicle information
+                    print(Fore.CYAN + f"Getting vehicle info for: {identifiers[0]}" + Style.RESET_ALL)
+                    # Use the same API endpoint but format differently
+                    vehicle_data = await self.samsara_tools.get_vehicle_locations(
+                        identifiers if identifiers else None
+                    )
+                    samsara_data = self.samsara_tools.format_vehicle_info_for_email(vehicle_data)
                 else:
                     vehicles = await self.samsara_tools.get_all_vehicles()
-                    samsara_data = f"All Vehicle Information:\n{vehicles}"
+                    samsara_data = self.samsara_tools.format_vehicle_info_for_email({"data": vehicles})
                     
             elif query_type == "driver_info":
                 if identifiers and len(identifiers) > 0:
@@ -362,7 +397,7 @@ class Nodes:
                     
             elif query_type == "all_vehicles":
                 vehicles = await self.samsara_tools.get_all_vehicles()
-                samsara_data = f"All Vehicles:\n{vehicles}"
+                samsara_data = self.samsara_tools.format_vehicle_info_for_email({"data": vehicles})
                 
             elif query_type == "all_drivers":
                 drivers = await self.samsara_tools.get_all_drivers()
@@ -370,7 +405,16 @@ class Nodes:
         
         except Exception as e:
             print(Fore.RED + f"Error fetching Samsara data: {str(e)}" + Style.RESET_ALL)
+            import traceback
+            traceback.print_exc()  # Add traceback for more detailed error information
             samsara_data = "Error: Unable to retrieve data from Samsara at this time."
+        
+        # Final output to see what we're sending to the email generator (truncated for large outputs)
+        print(Fore.GREEN + "Formatted Samsara data for email:" + Style.RESET_ALL)
+        if len(samsara_data) > 500:
+            print(samsara_data[:500] + "...")
+        else:
+            print(samsara_data)
         
         return {"retrieved_samsara_data": samsara_data}
 
