@@ -355,6 +355,7 @@ class Nodes:
             print(Fore.CYAN + f"Identifiers: {identifiers}" + Style.RESET_ALL)
             print(Fore.CYAN + f"Additional info: {additional_info}" + Style.RESET_ALL)
             
+            # Handle standard vehicle location queries
             if query_type == "vehicle_location":
                 # Check if we need real-time feed data or standard location data
                 if additional_info.get("real_time", False):
@@ -373,7 +374,8 @@ class Nodes:
                     )
                     # Format the data for email
                     samsara_data = self.samsara_tools.format_location_for_email(location_data)
-                
+            
+            # Handle standard vehicle info queries        
             elif query_type == "vehicle_info":
                 if identifiers and len(identifiers) > 0:
                     # Get specific vehicle information
@@ -382,26 +384,209 @@ class Nodes:
                     vehicle_data = await self.samsara_tools.get_vehicle_locations(
                         identifiers if identifiers else None
                     )
-                    samsara_data = self.samsara_tools.format_vehicle_info_for_email(vehicle_data)
-                else:
-                    vehicles = await self.samsara_tools.get_all_vehicles()
-                    samsara_data = self.samsara_tools.format_vehicle_info_for_email({"data": vehicles})
                     
+                    # Also get driver assignments for these vehicles to include driver information
+                    driver_assignments = await self.samsara_tools.get_vehicle_driver_assignments(identifiers)
+                    
+                    # Format with both vehicle and driver information
+                    samsara_data = self.samsara_tools.format_vehicle_info_for_email(
+                        vehicle_data, 
+                        driver_assignments
+                    )
+                else:
+                    # Get all vehicles
+                    vehicles = await self.samsara_tools.get_all_vehicles()
+                    
+                    # Get all vehicle IDs to fetch driver assignments
+                    vehicle_ids = [str(vehicle.get("id")) for vehicle in vehicles if vehicle.get("id")]
+                    
+                    # Get driver assignments for all vehicles
+                    driver_assignments = await self.samsara_tools.get_vehicle_driver_assignments(vehicle_ids)
+                    
+                    # Format with both vehicle and driver information
+                    samsara_data = self.samsara_tools.format_vehicle_info_for_email(
+                        {"data": vehicles}, 
+                        driver_assignments
+                    )
+                    
+            # Handle standard driver info queries
             elif query_type == "driver_info":
                 if identifiers and len(identifiers) > 0:
-                    driver_info = await self.samsara_tools.get_driver_info(identifiers[0])
-                    samsara_data = f"Driver Information:\n{driver_info}"
+                    try:
+                        # First try directly with the ID as a driver ID
+                        driver_info = await self.samsara_tools.get_driver_info(identifiers[0])
+                        
+                        # If we get a 404 or empty response, the ID might be a vehicle ID
+                        if not driver_info or "error" in driver_info:
+                            print(Fore.YELLOW + f"Driver not found, trying to get driver assignment for vehicle: {identifiers[0]}" + Style.RESET_ALL)
+                            
+                            # Get driver assignment for the vehicle
+                            driver_assignments = await self.samsara_tools.get_vehicle_driver_assignments([identifiers[0]])
+                            
+                            # Extract driver ID from assignment
+                            if driver_assignments and "data" in driver_assignments and driver_assignments["data"]:
+                                vehicle_data = driver_assignments["data"][0]
+                                if "driverAssignments" in vehicle_data and vehicle_data["driverAssignments"]:
+                                    # Get the first driver assignment (most recent)
+                                    assignment = vehicle_data["driverAssignments"][0]
+                                    if "driver" in assignment and assignment["driver"]:
+                                        driver_id = assignment["driver"].get("id")
+                                        driver_name = assignment["driver"].get("name", "Unknown")
+                                        vehicle_name = vehicle_data.get("name", "Unknown Vehicle")
+                                        
+                                        if driver_id:
+                                            print(Fore.GREEN + f"Found driver {driver_name} (ID: {driver_id}) for vehicle {identifiers[0]}" + Style.RESET_ALL)
+                                            # Now get the driver info with the correct ID
+                                            driver_info = await self.samsara_tools.get_driver_info(driver_id)
+                                            print(f"Driver info response: {driver_info}")
+                                            
+                                            # Format the driver information
+                                            if isinstance(driver_info, dict) and not "error" in driver_info:
+                                                formatted_driver = "Driver Information:\n\n"
+                                                
+                                                # Check if the response has a data field
+                                                if "data" in driver_info:
+                                                    driver_data = driver_info["data"]
+                                                    formatted_driver += f"- ID: {driver_data.get('id', 'Not available')}\n"
+                                                    formatted_driver += f"- Name: {driver_data.get('name', 'Not available')}\n"
+                                                    
+                                                    # Add other fields if available
+                                                    if "username" in driver_data:
+                                                        formatted_driver += f"- Username: {driver_data['username']}\n"
+                                                    if "phone" in driver_data:
+                                                        formatted_driver += f"- Phone: {driver_data['phone']}\n"
+                                                    if "licenseNumber" in driver_data:
+                                                        formatted_driver += f"- License: {driver_data['licenseNumber']}\n"
+                                                else:
+                                                    # Direct fields
+                                                    formatted_driver += f"- ID: {driver_info.get('id', 'Not available')}\n"
+                                                    formatted_driver += f"- Name: {driver_info.get('name', 'Not available')}\n"
+                                                
+                                                # Add vehicle assignment info
+                                                formatted_driver += "\nVehicle Assignment:\n"
+                                                formatted_driver += f"- Vehicle: {vehicle_name} (ID: {vehicle_data.get('id')})\n"
+                                                formatted_driver += f"- Assigned since: {assignment.get('startTime', 'Unknown')}\n"
+                                                
+                                                samsara_data = formatted_driver
+                                            else:
+                                                samsara_data = f"Driver Information:\n{driver_info}"
+                        else:
+                            # Process direct driver info response
+                            if isinstance(driver_info, dict) and "data" in driver_info:
+                                driver_data = driver_info["data"]
+                                formatted_driver = "Driver Information:\n\n"
+                                formatted_driver += f"- ID: {driver_data.get('id', 'Not available')}\n"
+                                formatted_driver += f"- Name: {driver_data.get('name', 'Not available')}\n"
+                                
+                                # Add other fields if available
+                                if "username" in driver_data:
+                                    formatted_driver += f"- Username: {driver_data['username']}\n"
+                                if "phone" in driver_data:
+                                    formatted_driver += f"- Phone: {driver_data['phone']}\n"
+                                if "licenseNumber" in driver_data:
+                                    formatted_driver += f"- License: {driver_data['licenseNumber']}\n"
+                                
+                                samsara_data = formatted_driver
+                            else:
+                                samsara_data = f"Driver Information:\n{driver_info}"
+                    except Exception as e:
+                        print(Fore.RED + f"Error getting driver info: {str(e)}" + Style.RESET_ALL)
+                        import traceback
+                        traceback.print_exc()  # Print full stack trace for debugging
+                        samsara_data = "Error: Unable to retrieve driver information at this time."
                 else:
                     drivers = await self.samsara_tools.get_all_drivers()
                     samsara_data = f"All Driver Information:\n{drivers}"
-                    
-            elif query_type == "all_vehicles":
-                vehicles = await self.samsara_tools.get_all_vehicles()
-                samsara_data = self.samsara_tools.format_vehicle_info_for_email({"data": vehicles})
+            
+            # Handle driver assignments query
+            elif query_type == "driver_assignments":
+                driver_assignments = await self.samsara_tools.get_vehicle_driver_assignments(
+                    identifiers if identifiers else None
+                )
+                samsara_data = self.samsara_tools.format_driver_assignments_for_email(driver_assignments)
+            
+            # Handle immobilizer status query
+            elif query_type == "immobilizer_status":
+                # Get start time from additional info if available
+                start_time = additional_info.get("start_time")
                 
-            elif query_type == "all_drivers":
-                drivers = await self.samsara_tools.get_all_drivers()
-                samsara_data = f"All Drivers:\n{drivers}"
+                immobilizer_data = await self.samsara_tools.get_vehicle_immobilizer_stream(
+                    identifiers if identifiers else None,
+                    start_time
+                )
+                samsara_data = self.samsara_tools.format_immobilizer_data_for_email(immobilizer_data)
+            
+            # Handle location history query
+            elif query_type == "location_history":
+                # Get time range from additional info
+                start_time = additional_info.get("start_time")
+                end_time = additional_info.get("end_time")
+                
+                if not start_time or not end_time:
+                    # Default to last 24 hours if not specified
+                    from datetime import datetime, timedelta
+                    now = datetime.utcnow()
+                    end_time = now.isoformat() + "Z"
+                    start_time = (now - timedelta(hours=24)).isoformat() + "Z"
+                
+                location_history = await self.samsara_tools.get_location_history(
+                    identifiers if identifiers else None,
+                    start_time,
+                    end_time
+                )
+                samsara_data = self.samsara_tools.format_location_history_for_email(location_history)
+            
+            # Handle vehicle stats query
+            elif query_type == "vehicle_stats":
+                # Get stat types from additional info if available
+                stat_types = additional_info.get("types", ["spreaderGranularName", "evChargingCurrentMilliAmp"])
+                
+                vehicle_stats = await self.samsara_tools.get_vehicle_stats_feed(
+                    identifiers if identifiers else None,
+                    stat_types
+                )
+                samsara_data = self.samsara_tools.format_vehicle_stats_for_email(vehicle_stats)
+            
+            # Handle vehicle stats history query
+            elif query_type == "vehicle_stats_history":
+                # Get time range and stat types from additional info
+                start_time = additional_info.get("start_time")
+                end_time = additional_info.get("end_time")
+                stat_types = additional_info.get("types", ["spreaderGranularName", "evChargingCurrentMilliAmp"])
+                
+                if not start_time or not end_time:
+                    # Default to last 24 hours if not specified
+                    from datetime import datetime, timedelta
+                    now = datetime.utcnow()
+                    end_time = now.isoformat() + "Z"
+                    start_time = (now - timedelta(hours=24)).isoformat() + "Z"
+                
+                stats_history = await self.samsara_tools.get_vehicle_stats_history(
+                    identifiers if identifiers else None,
+                    start_time,
+                    end_time,
+                    stat_types
+                )
+                samsara_data = self.samsara_tools.format_vehicle_stats_for_email(stats_history)
+            
+            # Handle tachograph files query
+            elif query_type == "tachograph_files":
+                # Get start time and after token from additional info
+                start_time = additional_info.get("start_time")
+                after = additional_info.get("after")
+                
+                if not start_time:
+                    # Default to last 7 days if not specified
+                    from datetime import datetime, timedelta
+                    now = datetime.utcnow()
+                    start_time = (now - timedelta(days=7)).isoformat() + "Z"
+                
+                tachograph_data = await self.samsara_tools.get_tachograph_files_history(
+                    identifiers if identifiers else None,
+                    start_time,
+                    after
+                )
+                samsara_data = self.samsara_tools.format_tachograph_files_for_email(tachograph_data)
         
         except Exception as e:
             print(Fore.RED + f"Error fetching Samsara data: {str(e)}" + Style.RESET_ALL)
@@ -426,10 +611,58 @@ class Nodes:
         query_type = state["samsara_query_type"]
         samsara_data = state["retrieved_samsara_data"]
         
+        # Check if there's actually data in the response
+        no_data_indicators = [
+            "No vehicle location data available",
+            "No vehicle information available",
+            "No driver information available",
+            "Error: Unable to retrieve data",
+            "API Error:"
+        ]
+        
+        has_data = True
+        for indicator in no_data_indicators:
+            if indicator in samsara_data:
+                has_data = False
+                break
+        
+        # In case of vehicle location, specifically check for the format of location data
+        if query_type == "vehicle_location" and "Vehicle Locations:" in samsara_data:
+            # If it just says "no data available" after the header
+            has_data = not "No location data available" in samsara_data
+        
+        # For vehicle info requests, specifically look for vehicle details
+        if query_type == "vehicle_info" and "Vehicle Information:" in samsara_data:
+            # If all fields say "Not available", consider it as no data
+            not_available_count = samsara_data.count("Not available")
+            has_data = not_available_count < 5  # If almost everything is "Not available"
+        
+        # Add a debug print to see what we determined
+        print(Fore.CYAN + f"Has valid Samsara data: {has_data}" + Style.RESET_ALL)
+        
+        # Inject metadata into the samsara_data to help guide the AI
+        if has_data:
+            additional_info = {
+                "query_type": query_type,
+                "data_found": True
+            }
+        else:
+            additional_info = {
+                "query_type": query_type,
+                "data_found": False
+            }
+        
+        # Convert to JSON string to include with the data
+        import json
+        metadata = json.dumps(additional_info)
+        
+        # Add metadata as a comment at the top of samsara_data
+        enhanced_samsara_data = f"<!-- Metadata: {metadata} -->\n{samsara_data}"
+        
         response = self.agents.generate_samsara_response.invoke({
             "original_query": original_query,
             "query_type": query_type,
-            "samsara_data": samsara_data
+            "samsara_data": enhanced_samsara_data
         })
         
         return {"generated_email": response}

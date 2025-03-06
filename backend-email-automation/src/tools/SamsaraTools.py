@@ -120,42 +120,18 @@ class SamsaraTools:
         Get real-time location feed for specified vehicles with client-side filtering
         """
         try:
-            # Request without filters
+            # Build parameters with vehicle IDs if provided
             params = {}
-            
             if vehicle_ids and len(vehicle_ids) > 0:
-                print(f"Will filter feed for vehicles: {vehicle_ids}")
+                # Join vehicle IDs with commas for the API
+                vehicle_ids_param = ",".join([str(id).strip() for id in vehicle_ids])
+                params["vehicleIds"] = vehicle_ids_param
+                print(f"Requesting location feed for vehicles: {vehicle_ids_param}")
             else:
                 print("Requesting location feed for all vehicles")
             
             # Make the API request
             result = await self._make_api_request("/fleet/vehicles/locations/feed", params)
-            
-            # If we need to filter by specific vehicle IDs
-            if vehicle_ids and len(vehicle_ids) > 0:
-                # Handle both string and int IDs
-                vehicle_id_set = set([str(id).strip() for id in vehicle_ids])
-                
-                # Filter the response data
-                if 'data' in result:
-                    original_count = len(result.get('data', []))
-                    
-                    filtered_data = [
-                        vehicle for vehicle in result.get('data', [])
-                        if str(vehicle.get('id', '')).strip() in vehicle_id_set
-                    ]
-                    
-                    # Log how many vehicles were filtered
-                    print(f"Filtered feed from {original_count} vehicles to {len(filtered_data)} vehicles")
-                    
-                    # Replace the data array with our filtered results
-                    result['data'] = filtered_data
-                    
-                    # If no matching vehicles found after filtering
-                    if not filtered_data:
-                        print(f"Warning: No vehicles found in feed matching IDs: {vehicle_ids}")
-                        if original_count > 0:
-                            print(f"Available vehicle IDs in feed: {[v.get('id') for v in result.get('data', [])]}")
             
             # Add some debug info
             if result:
@@ -187,6 +163,318 @@ class SamsaraTools:
         """Get a list of all drivers"""
         response = await self._make_api_request("/fleet/drivers")
         return response.get("data", []) if response else []
+
+    # NEW METHODS FOR ADDITIONAL ENDPOINTS
+    
+    async def get_vehicle_driver_assignments(self, vehicle_ids: List[str] = None) -> Dict:
+        """
+        Get driver assignments for vehicles
+        Endpoint: /fleet/vehicles/driver-assignments
+        """
+        try:
+            params = {}
+            if vehicle_ids and len(vehicle_ids) > 0:
+                # For a single vehicle ID
+                if len(vehicle_ids) == 1:
+                    params["vehicleIds"] = str(vehicle_ids[0]).strip()
+                # For multiple vehicle IDs
+                else:
+                    params["vehicleIds"] = ",".join([str(id).strip() for id in vehicle_ids])
+            
+            return await self._make_api_request("/fleet/vehicles/driver-assignments", params)
+        except Exception as e:
+            print(f"Error in get_vehicle_driver_assignments: {str(e)}")
+            return {"data": []}
+    
+    async def get_vehicle_immobilizer_stream(self, vehicle_ids: List[str] = None, start_time: str = None) -> Dict:
+        """
+        Get vehicle immobilizer stream
+        Endpoint: /fleet/vehicles/immobilizer/stream
+        """
+        try:
+            params = {}
+            if start_time:
+                params["startTime"] = start_time
+                
+            if vehicle_ids and len(vehicle_ids) > 0:
+                params["vehicleIds"] = ",".join([str(id).strip() for id in vehicle_ids])
+            
+            return await self._make_api_request("/fleet/vehicles/immobilizer/stream", params)
+        except Exception as e:
+            print(f"Error in get_vehicle_immobilizer_stream: {str(e)}")
+            return {"data": []}
+    
+    async def get_location_history(self, 
+                              vehicle_ids: List[str], 
+                              start_time: str, 
+                              end_time: str) -> Dict:
+        """
+        Get historical location data for vehicles
+        Endpoint: /fleet/vehicles/locations/history
+        """
+        try:
+            params = {
+                "startTime": start_time,
+                "endTime": end_time
+            }
+            
+            if vehicle_ids and len(vehicle_ids) > 0:
+                params["vehicleIds"] = ",".join([str(id).strip() for id in vehicle_ids])
+            
+            return await self._make_api_request("/fleet/vehicles/locations/history", params)
+        except Exception as e:
+            print(f"Error in get_location_history: {str(e)}")
+            return {"data": []}
+    
+    async def get_vehicle_stats_feed(self, 
+                               vehicle_ids: List[str] = None, 
+                               types: List[str] = None) -> Dict:
+        """
+        Get vehicle stats feed for specific metrics
+        Endpoint: /fleet/vehicles/stats/feed
+        """
+        try:
+            params = {}
+            
+            if vehicle_ids and len(vehicle_ids) > 0:
+                params["vehicleIds"] = ",".join([str(id).strip() for id in vehicle_ids])
+                
+            if types and len(types) > 0:
+                params["types"] = ",".join(types)
+            else:
+                # Default types if none specified
+                params["types"] = "spreaderGranularName,evChargingCurrentMilliAmp"
+            
+            return await self._make_api_request("/fleet/vehicles/stats/feed", params)
+        except Exception as e:
+            print(f"Error in get_vehicle_stats_feed: {str(e)}")
+            return {"data": []}
+    
+    async def get_vehicle_stats_history(self, 
+                                  vehicle_ids: List[str], 
+                                  start_time: str, 
+                                  end_time: str,
+                                  types: List[str] = None) -> Dict:
+        """
+        Get historical vehicle stats
+        Endpoint: /fleet/vehicles/stats/history
+        """
+        try:
+            params = {
+                "startTime": start_time,
+                "endTime": end_time
+            }
+            
+            if vehicle_ids and len(vehicle_ids) > 0:
+                params["vehicleIds"] = ",".join([str(id).strip() for id in vehicle_ids])
+                
+            if types and len(types) > 0:
+                params["types"] = ",".join(types)
+            else:
+                # Default types if none specified
+                params["types"] = "spreaderGranularName,evChargingCurrentMilliAmp"
+            
+            return await self._make_api_request("/fleet/vehicles/stats/history", params)
+        except Exception as e:
+            print(f"Error in get_vehicle_stats_history: {str(e)}")
+            return {"data": []}
+    
+    async def get_tachograph_files_history(self, 
+                                    vehicle_ids: List[str], 
+                                    start_time: str, 
+                                    after: str = None) -> Dict:
+        """
+        Get tachograph file history for vehicles
+        Endpoint: /fleet/vehicles/tachograph-files/history
+        """
+        try:
+            params = {
+                "startTime": start_time
+            }
+            
+            if after:
+                params["after"] = after
+                
+            if vehicle_ids and len(vehicle_ids) > 0:
+                params["vehicleIds"] = ",".join([str(id).strip() for id in vehicle_ids])
+            
+            return await self._make_api_request("/fleet/vehicles/tachograph-files/history", params)
+        except Exception as e:
+            print(f"Error in get_tachograph_files_history: {str(e)}")
+            return {"data": []}
+    
+    # ADDITIONAL FORMATTER METHODS FOR NEW DATA TYPES
+    
+    def format_driver_assignments_for_email(self, assignments_data: Dict) -> str:
+        """Format driver assignment data for email responses"""
+        vehicles = assignments_data.get("data", [])
+        if not vehicles:
+            return "No driver assignment data available."
+        
+        formatted_text = "Vehicle Driver Assignments:\n\n"
+        
+        for vehicle in vehicles:
+            vehicle_id = vehicle.get("id", "Unknown")
+            vehicle_name = vehicle.get("name", f"Vehicle {vehicle_id}")
+            
+            assignments = vehicle.get("driverAssignments", [])
+            if not assignments:
+                formatted_text += f"- {vehicle_name} (ID: {vehicle_id}): No driver assigned\n\n"
+                continue
+            
+            # Get the most recent assignment (first in the list)
+            assignment = assignments[0]
+            driver = assignment.get("driver", {})
+            driver_id = driver.get("id", "Unassigned")
+            driver_name = driver.get("name", "No driver assigned")
+            
+            formatted_text += f"- {vehicle_name} (ID: {vehicle_id}):\n"
+            formatted_text += f"  Driver: {driver_name}\n"
+            formatted_text += f"  Driver ID: {driver_id}\n"
+            
+            # Add assignment details if available
+            start_time = assignment.get("startTime")
+            if start_time:
+                formatted_text += f"  Assigned since: {start_time}\n"
+                
+            is_passenger = assignment.get("isPassenger", False)
+            if is_passenger:
+                formatted_text += f"  Role: Passenger\n"
+            else:
+                formatted_text += f"  Role: Driver\n"
+            
+            formatted_text += "\n"
+        
+        return formatted_text
+    
+    def format_immobilizer_data_for_email(self, immobilizer_data: Dict) -> str:
+        """Format immobilizer data for email responses"""
+        vehicles = immobilizer_data.get("data", [])
+        if not vehicles:
+            return "No immobilizer data available."
+        
+        formatted_text = "Vehicle Immobilizer Status:\n\n"
+        
+        for vehicle in vehicles:
+            vehicle_id = vehicle.get("id", "Unknown")
+            name = vehicle.get("name", f"Vehicle {vehicle_id}")
+            
+            immobilizer = vehicle.get("immobilizer", {})
+            is_immobilized = immobilizer.get("isImmobilized", False)
+            last_updated = immobilizer.get("updatedAtTime", "Unknown")
+            
+            status = "IMMOBILIZED" if is_immobilized else "MOBILE"
+            
+            formatted_text += f"- {name} (ID: {vehicle_id}):\n"
+            formatted_text += f"  Status: {status}\n"
+            formatted_text += f"  Last Updated: {last_updated}\n\n"
+        
+        return formatted_text
+    
+    def format_location_history_for_email(self, history_data: Dict) -> str:
+        """Format location history data for email responses"""
+        vehicles = history_data.get("data", [])
+        if not vehicles:
+            return "No location history data available."
+        
+        formatted_text = "Vehicle Location History:\n\n"
+        
+        for vehicle in vehicles:
+            vehicle_id = vehicle.get("id", "Unknown")
+            name = vehicle.get("name", f"Vehicle {vehicle_id}")
+            
+            # Get locations array - may be empty
+            locations = vehicle.get("locations", [])
+            if not locations:
+                formatted_text += f"- {name} (ID: {vehicle_id}): No location history available\n\n"
+                continue
+                
+            formatted_text += f"- {name} (ID: {vehicle_id}):\n"
+            
+            # Limit to 5 most recent locations to avoid excessively long emails
+            max_locations = min(5, len(locations))
+            for i in range(max_locations):
+                location = locations[i]
+                latitude = location.get("latitude", "N/A")
+                longitude = location.get("longitude", "N/A")
+                time_stamp = location.get("time", "Unknown")
+                
+                formatted_text += f"  [{i+1}] Time: {time_stamp}\n"
+                formatted_text += f"      Location: {latitude}, {longitude}\n"
+                
+                # Add address if available
+                reverse_geo = location.get("reverseGeo", {})
+                if reverse_geo and "formattedLocation" in reverse_geo:
+                    formatted_text += f"      Address: {reverse_geo['formattedLocation']}\n"
+                
+                # Add Google Maps link
+                formatted_text += f"      Maps: https://maps.google.com/?q={latitude},{longitude}\n"
+            
+            if len(locations) > max_locations:
+                formatted_text += f"  ... and {len(locations) - max_locations} more locations\n"
+            
+            formatted_text += "\n"
+        
+        return formatted_text
+    
+    def format_vehicle_stats_for_email(self, stats_data: Dict) -> str:
+        """Format vehicle stats data for email responses"""
+        vehicles = stats_data.get("data", [])
+        if not vehicles:
+            return "No vehicle stats data available."
+        
+        formatted_text = "Vehicle Stats Information:\n\n"
+        
+        for vehicle in vehicles:
+            vehicle_id = vehicle.get("id", "Unknown")
+            name = vehicle.get("name", f"Vehicle {vehicle_id}")
+            
+            formatted_text += f"- {name} (ID: {vehicle_id}):\n"
+            
+            # Process each stat type
+            for stat_type, stat_value in vehicle.items():
+                # Skip id and name
+                if stat_type in ["id", "name"]:
+                    continue
+                
+                # Format the stat based on type
+                if stat_type == "evChargingCurrentMilliAmp":
+                    value = f"{int(stat_value) / 1000:.2f} Amps" if isinstance(stat_value, (int, float)) else "N/A"
+                    formatted_text += f"  EV Charging Current: {value}\n"
+                elif stat_type == "spreaderGranularName":
+                    formatted_text += f"  Spreader Granular: {stat_value}\n"
+                else:
+                    # Generic formatting for other stat types
+                    formatted_name = ' '.join(word.capitalize() for word in stat_type.split('_'))
+                    formatted_text += f"  {formatted_name}: {stat_value}\n"
+            
+            formatted_text += "\n"
+        
+        return formatted_text
+    
+    def format_tachograph_files_for_email(self, tachograph_data: Dict) -> str:
+        """Format tachograph files data for email responses"""
+        files = tachograph_data.get("data", [])
+        if not files:
+            return "No tachograph files available."
+        
+        formatted_text = "Tachograph Files:\n\n"
+        
+        for file in files:
+            vehicle_id = file.get("vehicleId", "Unknown")
+            vehicle_name = file.get("vehicleName", f"Vehicle {vehicle_id}")
+            
+            file_id = file.get("id", "Unknown")
+            file_type = file.get("fileType", "Unknown")
+            start_time = file.get("startTime", "Unknown")
+            end_time = file.get("endTime", "Unknown")
+            
+            formatted_text += f"- {vehicle_name} (ID: {vehicle_id}):\n"
+            formatted_text += f"  File ID: {file_id}\n"
+            formatted_text += f"  Type: {file_type}\n"
+            formatted_text += f"  Period: {start_time} to {end_time}\n\n"
+        
+        return formatted_text
     
     def format_location_for_email(self, location_data: Dict) -> str:
         """Format location data in a readable format for email responses"""
@@ -267,45 +555,82 @@ class SamsaraTools:
         
         return formatted_text
     
-    def format_vehicle_info_for_email(self, vehicle_data: Dict) -> str:
-        """Format vehicle information in a readable format for email responses"""
+    def format_vehicle_info_for_email(self, vehicle_data: Dict, driver_assignments_data: Dict = None) -> str:
+        """Format vehicle information in a readable format for email responses, including driver info"""
         vehicles = vehicle_data.get("data", [])
         if not vehicles:
             return "No vehicle information available."
         
         formatted_text = "Vehicle Information:\n\n"
         
+        # Create driver lookup dictionary if driver assignments are provided
+        driver_lookup = {}
+        if driver_assignments_data:
+            for assignment in driver_assignments_data.get("data", []):
+                vehicle_id = str(assignment.get("id", ""))
+                
+                # Check for driverAssignments array
+                driver_assignments = assignment.get("driverAssignments", [])
+                if driver_assignments and len(driver_assignments) > 0:
+                    driver = driver_assignments[0].get("driver", {})
+                    if vehicle_id and driver:
+                        driver_lookup[vehicle_id] = {
+                            "name": driver.get("name", "Not assigned"),
+                            "id": driver.get("id", ""),
+                            "assigned_since": driver_assignments[0].get("startTime", "Unknown")
+                        }
+        
         for vehicle in vehicles:
-            vehicle_id = vehicle.get("id", "Not available")
+            vehicle_id = str(vehicle.get("id", "Not available"))
             name = vehicle.get("name", "Not available")
             
-            # Extract VIN and other data from externalIds
-            external_ids = vehicle.get("externalIds", {})
-            vin = external_ids.get("samsara.vin", "Not available")
+            # Extract vehicle details - first try from the vehicle object directly
+            make = vehicle.get("make", "Not available")
+            if make == "Not available":  # Default fallback
+                make = "VOLVO TRUCK"
+                
+            model = vehicle.get("model", "Not available")
+            year = vehicle.get("year", "Not available")
             
-            # Get additional details if available
-            make = "VOLVO TRUCK"  # Default value, ideally would be extracted from actual data
-            model = "Not available"
-            year = "Not available"
+            # Extract VIN either from direct property or from externalIds
+            vin = vehicle.get("vin", "Not available")
+            if vin == "Not available" and "externalIds" in vehicle:
+                external_ids = vehicle.get("externalIds", {})
+                vin = external_ids.get("samsara.vin", "Not available")
             
-            # If there's a VIN, we might be able to extract year from it
-            if vin != "Not available" and len(vin) >= 10:
-                # The 10th character of a VIN typically represents the model year
-                year_char = vin[9]
-                # This is a simplified mapping - real implementation would be more complex
-                year_map = {
-                    'A': '2010', 'B': '2011', 'C': '2012', 'D': '2013', 
-                    'E': '2014', 'F': '2015', 'G': '2016', 'H': '2017',
-                    'J': '2018', 'K': '2019', 'L': '2020', 'M': '2021',
-                    'N': '2022', 'P': '2023', 'R': '2024', 'S': '2025'
-                }
-                year = year_map.get(year_char, "Not available")
+            # Get license plate if available
+            license_plate = vehicle.get("licensePlate", "Not available")
+            
+            # Look for static assigned driver first
+            driver_name = "Not assigned"
+            driver_id = ""
+            static_driver = vehicle.get("staticAssignedDriver", {})
+            if static_driver:
+                driver_name = static_driver.get("name", "Not assigned")
+                driver_id = static_driver.get("id", "")
+            
+            # If no static driver, check the driver assignments lookup
+            if driver_name == "Not assigned" and vehicle_id in driver_lookup:
+                driver_info = driver_lookup.get(vehicle_id, {})
+                driver_name = driver_info.get("name", "Not assigned")
+                driver_id = driver_info.get("id", "")
             
             formatted_text += f"- ID: {vehicle_id}\n"
             formatted_text += f"- Name: {name}\n"
             formatted_text += f"- VIN: {vin}\n"
             formatted_text += f"- Make: {make}\n"
             formatted_text += f"- Model: {model}\n"
-            formatted_text += f"- Year: {year}\n\n"
+            formatted_text += f"- Year: {year}\n"
+            
+            # Add license plate if available
+            if license_plate != "Not available":
+                formatted_text += f"- License Plate: {license_plate}\n"
+            
+            # Add driver information
+            formatted_text += f"- Assigned Driver: {driver_name}\n"
+            if driver_id:
+                formatted_text += f"- Driver ID: {driver_id}\n"
+            
+            formatted_text += "\n"
         
         return formatted_text
