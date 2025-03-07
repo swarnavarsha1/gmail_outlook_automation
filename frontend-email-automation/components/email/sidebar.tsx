@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SimplifiedTimeframeSelector } from "@/components/ui/simplified-timeframe";
-import { useToast } from "@/components/hooks/use-toast";
+import { useToast } from "@/components/ui/toast-context";
 
 interface Account {
   email: string;
@@ -34,7 +34,9 @@ const EmailSidebar: React.FC<EmailSidebarProps> = ({ onAccountChange }) => {
   const [timeUnit, setTimeUnit] = useState<'hours' | 'days'>('hours');
   const [isCheckingGmail, setIsCheckingGmail] = useState(false);
   const [isCheckingOutlook, setIsCheckingOutlook] = useState(false);
-  const { toast } = useToast();
+  
+  // Replace notification state with useToast hook
+  const { addToast } = useToast();
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -136,54 +138,44 @@ const EmailSidebar: React.FC<EmailSidebarProps> = ({ onAccountChange }) => {
       }
       
       const result = await response.json();
-      const logMessages = result.logs?.filter(Boolean) || [];
+      
+      // Check the stats from the response
+      const processedEmails = result.stats?.processed_emails || 0;
+      const draftsCreated = result.stats?.drafts_created || 0;
+      
+      let message = '';
+      let toastType: 'success' | 'error' | 'info' = 'info';
 
-      // Show check completed toast
-      toast({
-        title: `${service.charAt(0).toUpperCase() + service.slice(1)} Check Complete`,
-        description: (
-          <div className="mt-2">
-            <p className="mb-2">{result.message}</p>
-            <div className="text-sm">
-              Processed: {result.stats.processed_emails} emails
-            </div>
-          </div>
-        ),
-        duration: Infinity, // Make it persistent
-      });
-
-      // If drafts were created, show draft generation toast
-      if (result.stats.drafts_created > 0) {
-        toast({
-          title: "Drafts Generated",
-          description: (
-            <div className="mt-2">
-              <div className="mb-2">
-                Created {result.stats.drafts_created} draft{result.stats.drafts_created > 1 ? 's' : ''}
-              </div>
-              <div className="max-h-[300px] overflow-y-auto border-t pt-2">
-                {logMessages.map((log: string, index: number) => (
-                  <div 
-                    key={index}
-                    className="text-xs font-mono py-0.5"
-                  >
-                    {log}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ),
-          duration: Infinity, // Make it persistent
-        });
+      if (processedEmails === 0) {
+        // No emails to process
+        message = `${service.charAt(0).toUpperCase() + service.slice(1)}: No new emails to process.`;
+        toastType = 'info';
+      } else if (processedEmails > 0 && draftsCreated > 0) {
+        // Found emails and created drafts
+        message = `${service.charAt(0).toUpperCase() + service.slice(1)}: ${processedEmails} email(s) processed and ${draftsCreated} draft(s) created successfully.`;
+        toastType = 'success';
+      } else if (processedEmails > 0 && draftsCreated === 0) {
+        // Found emails but no drafts created
+        message = `${service.charAt(0).toUpperCase() + service.slice(1)}: ${processedEmails} email(s) processed but no drafts were created.`;
+        toastType = 'info';
+      } else {
+        // Default message if we can't determine
+        message = `${service.charAt(0).toUpperCase() + service.slice(1)} check completed. Check dashboard for updates.`;
+        toastType = 'info';
+      }
+      
+      // Show notification as a toast
+      addToast(message, toastType);
+      
+      // Immediately refresh the dashboard
+      const selectedAccountData = accounts.find(acc => acc.email === selectedAccount);
+      if (selectedAccountData && selectedAccountData.service === service) {
+        onAccountChange(selectedAccountData.email, selectedAccountData.service);
       }
       
     } catch (error: any) {
       console.error('Error checking emails:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || 'Failed to check emails',
-      });
+      addToast(error.message || 'Failed to check emails', 'error');
     } finally {
       setLoading(false);
     }

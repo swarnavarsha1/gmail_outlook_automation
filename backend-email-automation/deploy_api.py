@@ -10,10 +10,16 @@ from src.tools.enhanced_outlook_tools import EnhancedOutlookTools
 from datetime import datetime, timedelta
 from enum import Enum
 import logging
+import re
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Suppress noisy logs
+logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
+logging.getLogger('chromadb.telemetry').setLevel(logging.WARNING)
+logging.getLogger('asyncio').setLevel(logging.ERROR)
 
 config = config_manager.get_config()
 
@@ -39,12 +45,33 @@ class EmailServiceType(Enum):
 
 class EmailToolFactory:
     @staticmethod
-    def create_email_tool(service_type: EmailServiceType):
+    def create_email_tool(service_type: EmailServiceType, account_email: Optional[str] = None):
         try:
             if service_type == EmailServiceType.GMAIL:
-                return GmailToolsClass()
+                if account_email:
+                    # Get the specific Gmail account
+                    account = config_manager.get_gmail_account(account_email)
+                    if not account:
+                        raise ValueError(f"Gmail account not found: {account_email}")
+                    # Create tool with specific account credentials
+                    return GmailToolsClass(account_email)
+                else:
+                    # Use default account
+                    return GmailToolsClass()
             elif service_type == EmailServiceType.OUTLOOK:
-                return EnhancedOutlookTools(config.outlook.email)
+                if account_email:
+                    # Get the specific Outlook account
+                    account = config_manager.get_outlook_account(account_email)
+                    if not account:
+                        raise ValueError(f"Outlook account not found: {account_email}")
+                    # Create tool with specific account credentials
+                    return EnhancedOutlookTools(account_email)
+                else:
+                    # Use default account
+                    default_account = config_manager.get_outlook_account()
+                    if not default_account:
+                        raise ValueError("No Outlook accounts configured")
+                    return EnhancedOutlookTools(default_account.email)
         except Exception as e:
             logger.error(f"Error creating email tool: {str(e)}")
             raise HTTPException(status_code=400, detail=str(e))
@@ -61,7 +88,7 @@ async def get_email_stats(
     try:
         # Initialize service and tools
         service_type = EmailServiceType(service)
-        email_tools = EmailToolFactory.create_email_tool(service_type)
+        email_tools = EmailToolFactory.create_email_tool(service_type, account)
         
         # Initialize statistics
         stats = {
@@ -91,9 +118,39 @@ async def get_email_stats(
                     stats["total"] = len(inbox_emails)
                     stats["unread"] = sum(1 for email in inbox_emails 
                                         if 'UNREAD' in email.get('labelIds', []))
-                    stats["replied"] = sum(1 for email in inbox_emails 
-                                         if any(label in email.get('labelIds', []) 
-                                               for label in ['REPLIED', 'SENT']))
+                    
+                    # Count replies using threads
+                    try:
+                        # Get all thread IDs from inbox emails
+                        thread_ids = {email.get('threadId') for email in inbox_emails if email.get('threadId')}
+                        replied_threads = set()
+                        
+                        # Get messages from the Sent folder to compare
+                        sent_query = f'after:{int((datetime.now() - timedelta(hours=hours)).timestamp())} in:sent'
+                        sent_results = email_tools.service.users().messages().list(
+                            userId="me",
+                            q=sent_query
+                        ).execute()
+                        sent_messages = sent_results.get("messages", [])
+                        
+                        # Create a set of thread IDs that have sent messages
+                        sent_thread_ids = set()
+                        if sent_messages:
+                            for msg in sent_messages:
+                                msg_detail = email_tools.service.users().messages().get(
+                                    userId="me", id=msg['id']).execute()
+                                sent_thread_ids.add(msg_detail.get('threadId'))
+                        
+                        # Check which inbox threads also have sent messages
+                        for thread_id in thread_ids:
+                            if thread_id in sent_thread_ids:
+                                replied_threads.add(thread_id)
+                        
+                        stats["replied"] = len(replied_threads)
+                        if stats['replied'] > 0:
+                            logger.debug(f"Found {stats['replied']} replied threads")       
+                    except Exception as reply_error:
+                        logger.error(f"Error counting Gmail replies: {str(reply_error)}")
                     
                 # Fetch Gmail drafts
                 try:
@@ -156,28 +213,7 @@ async def get_email_stats(
 async def get_accounts():
     """Get configured email accounts"""
     try:
-        accounts = []
-        
-        # Check Gmail configuration
-        if config.gmail.email:
-            accounts.append({
-                "email": config.gmail.email,
-                "service": "gmail",
-                "isConfigured": bool(config.gmail.credentials_file)
-            })
-            
-        # Check Outlook configuration
-        if config.outlook.email:
-            accounts.append({
-                "email": config.outlook.email,
-                "service": "outlook",
-                "isConfigured": bool(all([
-                    config.outlook.client_id,
-                    config.outlook.client_secret,
-                    config.outlook.tenant_id
-                ]))
-            })
-            
+        accounts = config_manager.get_all_accounts()
         return accounts
     except Exception as e:
         logger.error(f"Error getting accounts: {str(e)}")
@@ -195,7 +231,7 @@ async def get_recent_emails(
     try:
         # Initialize service and tools
         service_type = EmailServiceType(service)
-        email_tools = EmailToolFactory.create_email_tool(service_type)
+        email_tools = EmailToolFactory.create_email_tool(service_type, account)
         
         recent_emails = []
         
@@ -277,17 +313,24 @@ async def health_check():
     try:
         validation_result = config_manager.validate_config()
         
+        # Get configured accounts
+        accounts = config_manager.get_all_accounts()
+        
+        # Group accounts by service
+        gmail_accounts = [acc for acc in accounts if acc['service'] == 'gmail']
+        outlook_accounts = [acc for acc in accounts if acc['service'] == 'outlook']
+        
         return {
             "status": "healthy",
             "accounts": {
-                "gmail": {
-                    "email": config.gmail.email,
-                    "configured": validation_result['gmail_configured']
-                },
-                "outlook": {
-                    "email": config.outlook.email,
-                    "configured": validation_result['outlook_configured']
-                }
+                "gmail": gmail_accounts,
+                "outlook": outlook_accounts
+            },
+            "configuration": {
+                "gmail_configured": validation_result['gmail_configured'],
+                "outlook_configured": validation_result['outlook_configured'],
+                "ai_configured": validation_result['ai_configured'],
+                "samsara_configured": validation_result['samsara_configured']
             }
         }
     except Exception as e:
@@ -298,14 +341,15 @@ async def health_check():
 async def search_emails(
     service: str = Query(..., pattern="^(gmail|outlook)$"),
     search_term: str = Query(..., min_length=1),
-    hours: int = Query(default=24, ge=1)  # Default to 24 hours
+    hours: int = Query(default=24, ge=1),
+    account: Optional[str] = None
 ):
     """
     Search emails for specific sender/customer
     """
     try:
         service_type = EmailServiceType(service)
-        email_tools = EmailToolFactory.create_email_tool(service_type)
+        email_tools = EmailToolFactory.create_email_tool(service_type, account)
         
         try:
             total_count = 0
@@ -351,15 +395,42 @@ async def search_emails(
         logger.error(error_msg)
         raise HTTPException(status_code=500, detail=error_msg)
     
+
 @app.post("/api/check-emails")
 async def check_emails(
     service: str = Query(..., pattern="^(gmail|outlook)$"),
+    account: Optional[str] = None
 ):
     """
-    Trigger email check and draft generation for specified service
+    Trigger email check and draft generation for specified service and account
     """
     try:
-        workflow = Workflow(service)
+        # Create a custom Tee-like stdout that both captures and prints
+        import sys
+        from io import StringIO
+        
+        class TeeOutput:
+            def __init__(self, original_stdout, capture_buffer):
+                self.original_stdout = original_stdout
+                self.capture_buffer = capture_buffer
+                
+            def write(self, message):
+                # Write to original stdout (terminal)
+                self.original_stdout.write(message)
+                # Also capture to our buffer
+                self.capture_buffer.write(message)
+                
+            def flush(self):
+                self.original_stdout.flush()
+                
+        # Set up our capture mechanism
+        captured_output = StringIO()
+        original_stdout = sys.stdout
+        tee_output = TeeOutput(original_stdout, captured_output)
+        sys.stdout = tee_output
+        
+        # Initialize workflow with specific account
+        workflow = Workflow(service, account)
         
         initial_state = {
             "emails": [],
@@ -370,45 +441,60 @@ async def check_emails(
             "retrieved_documents": "",
             "writer_messages": [],
             "sendable": False,
-            "trials": 0
+            "trials": 0,
+            "samsara_query_type": "",
+            "samsara_identifiers": [],
+            "samsara_additional_info": {},
+            "retrieved_samsara_data": ""
         }
-
+        
         processed_count = 0
         drafts_created = 0
-        has_seen_email = False
-
-        async for state in workflow.app.astream(initial_state):
-            # Track when we see new emails
-            if 'emails' in state and state['emails']:
-                if not has_seen_email:
-                    processed_count = len([email for email in state['emails'] if email])
-                    has_seen_email = True
-            
-            # Count when a draft is actually created
-            if state.get('generated_email') and state.get('sendable'):
-                drafts_created += 1
-                
-            # Log the current state for debugging
-            logger.info(f"Current state - Processed: {processed_count}, Drafts: {drafts_created}")
-
-        await workflow.nodes.cleanup()
         
-        log_stream = io.StringIO()
-        log_handler = logging.StreamHandler(log_stream)
-        log_handler.setFormatter(logging.Formatter('%(message)s'))
-        logger.addHandler(log_handler)
+        try:
+            # Execute the workflow
+            async for state in workflow.app.astream(initial_state):
+                # Let the workflow run and print its messages
+                pass
+            
+            await workflow.nodes.cleanup()
+            
+        finally:
+            # Restore original stdout
+            sys.stdout = original_stdout
+        
+        # Get the captured output
+        output_text = captured_output.getvalue()
+        
+        # Parse the output to count processed emails and drafts
+        import re
+        email_match = re.search(r'Found (\d+) new emails to process', output_text)
+        if email_match:
+            processed_count = int(email_match.group(1))
+        
+        # Count draft creations
+        drafts_created = output_text.count("Draft created successfully")
+        
+        # Log the final statistics
+        logger.info(f"Email processing complete - Processed: {processed_count}, Drafts created: {drafts_created}")
+        
+        # Split the output into lines for the logs response
+        output_lines = output_text.splitlines()
         
         return {
             "status": "success",
-            "message": f"Email check completed for {service}",
+            "message": f"Email check completed for {service}" + (f" ({account})" if account else ""),
             "stats": {
                 "processed_emails": processed_count,
                 "drafts_created": drafts_created
             },
-            "logs": log_stream.getvalue().split('\n')
+            "logs": output_lines
         }
         
     except Exception as e:
+        # Make sure to restore stdout in case of exceptions
+        if 'original_stdout' in locals():
+            sys.stdout = original_stdout
         logger.error(f"Error checking emails: {str(e)}")
         raise HTTPException(
             status_code=500, 

@@ -26,3 +26,4 @@ class GraphState(TypedDict):
     samsara_identifiers: List[str]
     samsara_additional_info: Dict[str, Any]
     retrieved_samsara_data: str
+    draft_created: bool

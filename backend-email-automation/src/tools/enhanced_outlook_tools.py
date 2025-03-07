@@ -4,15 +4,20 @@ from config import config_manager
 
 class EnhancedOutlookTools(OutlookTools):
     def __init__(self, email_address):
+        # Find the correct account from config
         config = config_manager.get_config()
+        outlook_account = config_manager.get_outlook_account(email_address)
+        
+        if not outlook_account:
+            raise ValueError(f"Outlook account not found for {email_address}")
 
-        client_id = config.outlook.client_id
-        client_secret = config.outlook.client_secret
-        tenant_id = config.outlook.tenant_id
+        client_id = outlook_account.client_id
+        client_secret = outlook_account.client_secret
+        tenant_id = outlook_account.tenant_id
         
         # Validate credentials
         if not all([client_id, client_secret, tenant_id]):
-            raise ValueError("Missing required Outlook credentials in configuration")
+            raise ValueError(f"Missing required Outlook credentials for {email_address}")
             
         # Initialize base class
         super().__init__(client_id, client_secret, tenant_id)
@@ -454,3 +459,4 @@ class EnhancedOutlookTools(OutlookTools):
         except Exception as e:
             print(f"Error creating draft reply: {str(e)}")
             return None
+        

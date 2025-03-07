@@ -66,15 +66,28 @@ class EmailServiceDetector:
         """
         email_domain = email_address.lower().split('@')[1]
         warning = None
-        config = config_manager.get_config()
         
-        # First try MX record detection
+        # Check if email is in configured Gmail accounts
+        gmail_accounts = config_manager.get_config().gmail_accounts
+        for account in gmail_accounts:
+            if account.email.lower() == email_address.lower():
+                return EmailServiceType.GMAIL, None
+        
+        # Check if email is in configured Outlook accounts
+        outlook_accounts = config_manager.get_config().outlook_accounts
+        for account in outlook_accounts:
+            if account.email.lower() == email_address.lower():
+                return EmailServiceType.OUTLOOK, None
+        
+        # If not directly found in config, try MX record detection
         service_type = EmailServiceDetector.check_mx_records(email_domain)
         
         if service_type:
             # Validate credentials for detected service
-            if not EmailServiceDetector.is_valid_credentials(service_type):
-                warning = f"{service_type.value} credentials not properly configured"
+            if service_type == EmailServiceType.GMAIL and not EmailServiceDetector.is_valid_credentials(service_type, email_address):
+                warning = f"Gmail credentials not properly configured for {email_address}"
+            elif service_type == EmailServiceType.OUTLOOK and not EmailServiceDetector.is_valid_credentials(service_type, email_address):
+                warning = f"Outlook credentials not properly configured for {email_address}"
             return service_type, warning
             
         # If MX records don't give a clear answer, use domain patterns
@@ -100,18 +113,23 @@ class EmailServiceDetector:
         return service_type, warning
 
     @staticmethod
-    def is_valid_credentials(service_type: EmailServiceType) -> bool:
-        """Check if required credentials are available for the service"""
-        config = config_manager.get_config()
-
+    def is_valid_credentials(service_type: EmailServiceType, email_address: str = None) -> bool:
+        """Check if required credentials are available for the service and specific email"""
         if service_type == EmailServiceType.GMAIL:
-            return bool(config.gmail.credentials_file)
+            if email_address:
+                account = config_manager.get_gmail_account(email_address)
+                return bool(account and account.credentials_file)
+            else:
+                return any(account.credentials_file for account in config_manager.get_config().gmail_accounts)
         elif service_type == EmailServiceType.OUTLOOK:
-            return all([
-                config.outlook.client_id,
-                config.outlook.client_secret,
-                config.outlook.tenant_id
-            ])
+            if email_address:
+                account = config_manager.get_outlook_account(email_address)
+                return bool(account and account.client_id and account.client_secret and account.tenant_id)
+            else:
+                return any(
+                    account.client_id and account.client_secret and account.tenant_id 
+                    for account in config_manager.get_config().outlook_accounts
+                )
         return False
 
 class EmailTools:
@@ -125,7 +143,7 @@ class EmailTools:
             print(f"{Fore.YELLOW}Warning: {warning}{Style.RESET_ALL}")
         
         if self.service_type == EmailServiceType.GMAIL:
-            self.service = GmailToolsClass()
+            self.service = GmailToolsClass(email_address)
         else:
             self.service = EnhancedOutlookTools(email_address)
 
@@ -173,11 +191,11 @@ class Nodes:
         self.email_address = email_address
         self.email_tools = EmailTools(email_address)
         self.samsara_tools = SamsaraTools()
-        print(f"{Fore.CYAN}Initialized email service: {self.email_tools.service_type.value}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Initialized email service: {self.email_tools.service_type.value} for {email_address}{Style.RESET_ALL}")
 
     async def load_new_emails(self, state: GraphState) -> GraphState:
         """Load new emails from configured provider"""
-        print(Fore.YELLOW + f"Loading new emails from {self.email_tools.service_type.value}...\n" + Style.RESET_ALL)
+        print(Fore.YELLOW + f"Loading new emails for {self.email_address} ({self.email_tools.service_type.value})...\n" + Style.RESET_ALL)
         try:
             emails = await self.email_tools.fetch_unanswered_emails()
             if not emails:
@@ -676,9 +694,10 @@ class Nodes:
                 state["generated_email"]
             )
             print(Fore.GREEN + "Draft created successfully" + Style.RESET_ALL)
+            return {"retrieved_documents": "", "trials": 0, "draft_created": True}  # Add explicit flag
         except Exception as e:
             print(Fore.RED + f"Error creating draft: {str(e)}" + Style.RESET_ALL)
-        return {"retrieved_documents": "", "trials": 0}
+            return {"retrieved_documents": "", "trials": 0, "draft_created": False}  # Explicit failed flag
 
     async def send_email_response(self, state: GraphState) -> GraphState:
         """Send the email response"""

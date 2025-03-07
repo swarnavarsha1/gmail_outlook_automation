@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import EmailSidebar from '@/components/email/sidebar';
 import EmailDashboard from '@/components/email/dashboard';
+import { ToastProvider } from '@/components/ui/toast-context';
 
 interface EmailAccount {
   email: string;
@@ -17,12 +18,14 @@ const EmailMonitorLayout = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <EmailSidebar onAccountChange={handleAccountChange} />
-      <div className="flex-1 overflow-auto">
-        <EmailDashboard selectedAccount={selectedAccount} />
+    <ToastProvider>
+      <div className="flex h-screen bg-gray-50">
+        <EmailSidebar onAccountChange={handleAccountChange} />
+        <div className="flex-1 overflow-auto">
+          <EmailDashboard selectedAccount={selectedAccount} />
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   );
 };
 

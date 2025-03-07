@@ -19,8 +19,18 @@ from config import config_manager
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
 class GmailToolsClass(BaseEmailTool):
-    def __init__(self):
+    def __init__(self, account_email=None):
         self.config = config_manager.get_config()
+        # Get the specific account if provided, otherwise use the first one
+        if account_email:
+            self.account = config_manager.get_gmail_account(account_email)
+            if not self.account:
+                raise ValueError(f"Gmail account not found: {account_email}")
+        else:
+            self.account = config_manager.get_gmail_account()
+            if not self.account:
+                raise ValueError("No Gmail accounts configured")
+        
         self.service = self._get_gmail_service()
         self._executor = ThreadPoolExecutor(max_workers=5)
 
@@ -159,8 +169,8 @@ class GmailToolsClass(BaseEmailTool):
         """Initialize and get Gmail service"""
         try:
             creds = None
-            token_path = 'token.json'
-            credentials_path = self.config.gmail.credentials_file
+            token_path = f'token_{self.account.email.replace("@", "_").replace(".", "_")}.json'
+            credentials_path = self.account.credentials_file
             
             if not os.path.exists(credentials_path):
                 raise FileNotFoundError(f"Credentials file not found at: {credentials_path}")
@@ -186,7 +196,7 @@ class GmailToolsClass(BaseEmailTool):
     
     def _should_skip_email(self, email_info):
         """Check if email should be skipped"""
-        my_email = self.config.gmail.user_email
+        my_email = self.account.user_email
         if not my_email:
             raise ValueError("User email not configured for Gmail")
         return my_email.lower() in email_info['sender'].lower()
@@ -322,6 +332,13 @@ class GmailToolsClass(BaseEmailTool):
         html_part = MIMEText(html_content, "html")
         message.attach(html_part)
         return message
+    def get_thread(self, thread_id):
+        """Get a complete thread by ID"""
+        try:
+            return self.service.users().threads().get(userId='me', id=thread_id).execute()
+        except Exception as e:
+            print(f"Error fetching thread: {e}")
+            return None
 
     async def cleanup(self):
         """Cleanup method for the thread pool executor"""
