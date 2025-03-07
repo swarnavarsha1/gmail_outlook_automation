@@ -6,28 +6,45 @@ from typing import Optional
 from config import config_manager
 
 class Workflow:
-    def __init__(self, service: str = 'gmail'):
+    def __init__(self, service: str = 'gmail', email: str = None):
         """
-        Initialize workflow based on service type
+        Initialize workflow based on service type and email address
         
         Args:
             service: Email service to use ('gmail' or 'outlook')
+            email: Specific email address to use (must match a configured account)
         """
         workflow = StateGraph(GraphState)
         config = config_manager.get_config()
         
-        # Get appropriate email based on service
+        # Get appropriate email based on service and account
         if service == 'gmail':
-            email = config.gmail.email
-            if not email:
-                raise ValueError("Gmail email is not configured")
+            # Use the provided email or get the first valid account
+            if email:
+                account = config_manager.get_gmail_account(email)
+                if not account:
+                    raise ValueError(f"Gmail account not found: {email}")
+                email_address = account.email
+            else:
+                account = config_manager.get_gmail_account()
+                if not account:
+                    raise ValueError("No Gmail accounts configured")
+                email_address = account.email
         else:
-            email = config.outlook.email
-            if not email:
-                raise ValueError("Outlook email is not configured")
+            # Use the provided email or get the first valid account
+            if email:
+                account = config_manager.get_outlook_account(email)
+                if not account:
+                    raise ValueError(f"Outlook account not found: {email}")
+                email_address = account.email
+            else:
+                account = config_manager.get_outlook_account()
+                if not account:
+                    raise ValueError("No Outlook accounts configured")
+                email_address = account.email
             
         # Initialize nodes with email address
-        nodes = Nodes(email)
+        nodes = Nodes(email_address)
 
         # Define all graph nodes
         workflow.add_node("load_inbox_emails", nodes.load_new_emails)

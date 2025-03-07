@@ -2,8 +2,11 @@
 import requests
 import time
 import asyncio
+import logging
 from typing import Dict, List, Any, Optional
 from config import config_manager
+
+logger = logging.getLogger(__name__)
 
 class SamsaraTools:
     """Class to interact with Samsara API with built-in rate limiting handling"""
@@ -21,8 +24,8 @@ class SamsaraTools:
         url = f"{self.base_url}{endpoint}"
         
         # Print request details for debugging
-        print(f"Making Samsara API request to: {url}")
-        print(f"Request parameters: {params}")
+        logger.debug(f"Making Samsara API request to: {url}")
+        logger.debug(f"Request parameters: {params}")
         
         max_retries = 3
         retry_count = 0

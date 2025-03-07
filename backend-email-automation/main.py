@@ -4,6 +4,7 @@ from colorama import Fore, Style
 from src.graph import Workflow
 import traceback
 from config import config_manager
+import argparse
 
 # Get configuration
 config = config_manager.get_config()
@@ -22,19 +23,25 @@ if not validation_result['outlook_configured']:
 if not validation_result['ai_configured']:
     print(Fore.YELLOW + "Warning: AI services are not properly configured" + Style.RESET_ALL)
 
-async def run_workflow(service: str = 'gmail'):
-    """Run workflow for specified email service"""
+async def run_workflow(service: str = 'gmail', email: str = None):
+    """Run workflow for specified email service and account"""
     try:
-        # Select appropriate email based on service
+        # Select appropriate email based on service and account
         if service == 'gmail':
-            email = config.gmail.email
-            print(Fore.YELLOW + f"Using Gmail: {email}" + Style.RESET_ALL)
+            account = config_manager.get_gmail_account(email)
+            if not account:
+                raise ValueError(f"Gmail account not found: {email}")
+            email_address = account.email
+            print(Fore.YELLOW + f"Using Gmail: {email_address}" + Style.RESET_ALL)
         else:
-            email = config.outlook.email
-            print(Fore.YELLOW + f"Using Outlook: {email}" + Style.RESET_ALL)
+            account = config_manager.get_outlook_account(email)
+            if not account:
+                raise ValueError(f"Outlook account not found: {email}")
+            email_address = account.email
+            print(Fore.YELLOW + f"Using Outlook: {email_address}" + Style.RESET_ALL)
 
         # Initialize workflow
-        workflow = Workflow(service)
+        workflow = Workflow(service, email_address)
         app = workflow.app
 
         initial_state = {
@@ -53,7 +60,7 @@ async def run_workflow(service: str = 'gmail'):
             "retrieved_samsara_data": ""
         }
 
-        print(Fore.GREEN + f"Starting {service} workflow..." + Style.RESET_ALL)
+        print(Fore.GREEN + f"Starting {service} workflow for {email_address}..." + Style.RESET_ALL)
         async for output in app.astream(initial_state, workflow_config):
             for key, value in output.items():
                 print(Fore.CYAN + f"Finished running: {key}" + Style.RESET_ALL)
@@ -69,13 +76,13 @@ async def run_workflow(service: str = 'gmail'):
 
 async def main():
     """Main function to handle command line arguments"""
-    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--service', choices=['gmail', 'outlook'], default='gmail',
                        help='Email service to use')
+    parser.add_argument('--email', type=str, help='Email address to use (must match configured account)')
     args = parser.parse_args()
     
-    await run_workflow(args.service)
+    await run_workflow(args.service, args.email)
 
 if __name__ == "__main__":
     asyncio.run(main())
