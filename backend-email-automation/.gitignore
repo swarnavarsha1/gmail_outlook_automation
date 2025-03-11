@@ -2,10 +2,9 @@ venva
 .env
 token.json
 token_swarnabalaguru_ameyacloud_in.json
-credentials.json
-config.development.json
+
 __pycache__
 back/
 token_old.json
-token_darshan_wadekar04_gmail_com.json
+
 .dockerignore
