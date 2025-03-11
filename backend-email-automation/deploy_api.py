@@ -408,7 +408,7 @@ async def check_emails(
         # Create a custom Tee-like stdout that both captures and prints
         import sys
         from io import StringIO
-        
+        logger.info("Email processing starting")
         class TeeOutput:
             def __init__(self, original_stdout, capture_buffer):
                 self.original_stdout = original_stdout

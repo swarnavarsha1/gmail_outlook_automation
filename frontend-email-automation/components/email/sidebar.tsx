@@ -34,14 +34,16 @@ const EmailSidebar: React.FC<EmailSidebarProps> = ({ onAccountChange }) => {
   const [timeUnit, setTimeUnit] = useState<'hours' | 'days'>('hours');
   const [isCheckingGmail, setIsCheckingGmail] = useState(false);
   const [isCheckingOutlook, setIsCheckingOutlook] = useState(false);
-  
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   // Replace notification state with useToast hook
   const { addToast } = useToast();
+  console.log("API_URL is:", API_URL);
 
   useEffect(() => {
+    
     const fetchAccounts = async () => {
       try {
-        const response = await fetch('/api/accounts');
+        const response = await fetch(`${API_URL}/api/accounts`);
         if (!response.ok) {
           throw new Error('Failed to fetch accounts');
         }
@@ -128,7 +130,7 @@ const EmailSidebar: React.FC<EmailSidebarProps> = ({ onAccountChange }) => {
     
     try {
       setLoading(true);
-      const response = await fetch(`/api/check-emails?service=${service}`, {
+      const response = await fetch(`${API_URL}/api/check-emails?service=${service}`, {
         method: 'POST',
       });
       

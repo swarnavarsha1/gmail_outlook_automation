@@ -274,7 +274,7 @@ class EnhancedOutlookTools(OutlookTools):
             formatted_part = part.replace('\n', '<br>')
             formatted_parts.append(f"<p>{formatted_part}</p>")
         
-        html_content = f"""
+        html_content = """
         <!DOCTYPE html>
         <html>
         <head>
@@ -298,11 +298,11 @@ class EnhancedOutlookTools(OutlookTools):
             </style>
         </head>
         <body>
-            {'\n'.join(formatted_parts)}
+        """ +  '\n'.join(formatted_parts) + """"
         </body>
         </html>
-        """
-        return html_content.strip()
+        """.strip()
+        return html_content
 
     async def send_email(self, from_email, to_emails, subject, body):
         """Send an email"""

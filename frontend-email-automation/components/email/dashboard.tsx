@@ -3,7 +3,7 @@ import { Mail, CheckCircle, AlertCircle, Send, MessageSquare } from 'lucide-reac
 import { Card, CardContent } from '@/components/ui/card';
 import { TimeframeSelector } from '@/components/ui/timeframe-selector';
 import RecentEmails  from '@/components/ui/recent-emails';
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 interface EmailStats {
   total: number;
   read: number;
@@ -93,7 +93,7 @@ const EmailDashboard: React.FC<DashboardProps> = ({ selectedAccount }) => {
       });
 
       // Fetch stats
-      const statsResponse = await fetch(`/api/email-stats?${params}`, {
+      const statsResponse = await fetch(`${API_URL}/api/email-stats?${params}`, {
         signal: controller.signal,
         headers: {
           'Cache-Control': 'no-cache',
@@ -102,7 +102,7 @@ const EmailDashboard: React.FC<DashboardProps> = ({ selectedAccount }) => {
       });
 
       // Fetch recent emails
-      const emailsResponse = await fetch(`/api/recent-emails?${params}`, {
+      const emailsResponse = await fetch(`${API_URL}/api/recent-emails?${params}`, {
         signal: controller.signal,
         headers: {
           'Cache-Control': 'no-cache',

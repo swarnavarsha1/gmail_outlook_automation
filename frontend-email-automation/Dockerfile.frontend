@@ -1,0 +1,64 @@
+# Use official Node.js image
+FROM node:current-alpine3.21
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Copy only package files first (for better caching)
+COPY package.json package-lock.json .
+
+# Install dependencies
+RUN npm install
+
+# Copy the entire project (except ignored files)
+COPY . .
+
+# Ensure Next.js is installed
+RUN npm install next
+
+# Expose port 3000 for Next.js
+EXPOSE 3000
+
+# Run Next.js in development mode
+CMD ["npm", "run", "dev"]
+
+# # ---- Build Stage ----
+#     FROM node:18-slim AS builder
+
+#     WORKDIR /app
+    
+#     # Install dependencies first (use cache)
+#     COPY package.json package-lock.json ./
+#     RUN npm install --frozen-lockfile
+    
+#     # Copy remaining app files
+#     COPY . .
+    
+#     # Build Next.js project & Disable ESLint temporarily
+#     ENV NEXT_DISABLE_ESLINT=1
+#     ENV DISABLE_ESLINT=true
+#     RUN npm run build
+    
+#     # ---- Production Stage ----
+#     FROM node:18-slim AS runner
+    
+#     WORKDIR /app
+    
+#     # Install only production dependencies (reduces image size)
+#     COPY package.json package-lock.json ./
+#     RUN npm install --frozen-lockfile --production
+    
+#     # Copy built files from builder stage
+#     COPY --from=builder /app/.next .next
+#     COPY --from=builder /app/public public
+#     COPY --from=builder /app/node_modules node_modules
+    
+#     # Set environment
+#     ENV NODE_ENV=production
+    
+#     # Expose port
+#     EXPOSE 3000
+    
+#     # Start the app
+#     CMD ["npm", "run", "start"]
+    

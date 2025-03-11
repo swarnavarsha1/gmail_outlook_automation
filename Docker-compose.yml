@@ -1,0 +1,41 @@
+
+
+services:
+  backend:
+    build:
+      context: ./backend-email-automation
+      dockerfile: Dockerfile.backend
+    container_name: backend
+    working_dir: /app
+    ports:
+      - "8000:8000"
+#    volumes:
+#      - ./backend-email-automation/token_darshan_wadekar04_gmail_com.json:/app/token_darshan_wadekar04_gmail_com.json  # Mounts local backend folder
+    environment:
+      - PYTHONUNBUFFERED=1
+#    depends_on:
+#      - frontend
+    networks:
+      - mynetwork
+    command: ["/app/venv/bin/python", "deploy_api.py"]
+
+  frontend:
+    build:
+      context: ./frontend-email-automation
+      dockerfile: Dockerfile.frontend
+    container_name: frontend
+    working_dir: /app
+    ports:
+      - "3000:3000"
+   #volumes:
+   #   - ./frontend-email-automation:/app  # Mounts local frontend folder
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - backend
+    networks:
+      - mynetwork
+    command: ["npm", "run", "dev"]
+
+networks:
+  mynetwork:

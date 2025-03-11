@@ -180,10 +180,10 @@ class GmailToolsClass(BaseEmailTool):
                 
             if not creds or not creds.valid:
                 if creds and creds.expired and creds.refresh_token:
-                    creds.refresh(Request())
+                    creds.refresh(Request()) # ✅ Refresh without browser
                 else:
                     flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
-                    creds = flow.run_local_server(port=0)
+                    creds = flow.run_local_server(port=0, open_browser=False) # ✅ Console-based auth (no browser needed)
                     
                 # Save the credentials for the next run
                 with open(token_path, 'w') as token:

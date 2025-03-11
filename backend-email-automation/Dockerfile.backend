@@ -1,0 +1,31 @@
+# Use Red Hat UBI 9 with Python 3.11 as the base image
+FROM python:3.10
+
+# Install Chrome & Chromedriver
+RUN apt-get update && apt-get install -y \
+    wget unzip curl \
+    chromium-driver \
+    && apt-get clean
+
+# Set the working directory
+WORKDIR /app
+
+# Copy dependency file first to leverage Docker caching
+COPY requirements.txt .
+
+# Install dependencies in a virtual environment
+RUN python3 -m venv /app/venv && \
+    /app/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /app/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code
+COPY . .
+
+# Expose the port your app runs on (adjust if needed)
+EXPOSE 8000
+
+# Ensure Chrome is found
+ENV PATH="/usr/lib/chromium-browser/:${PATH}"
+
+# Set the default command to run your application
+CMD ["sh", "-c", "source /app/venv/bin/activate && exec python deploy_api.py"]
