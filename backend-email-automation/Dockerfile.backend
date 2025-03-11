@@ -7,6 +7,12 @@ RUN apt-get update && apt-get install -y \
     chromium-driver \
     && apt-get clean
 
+# Install bash
+RUN apt-get update && apt-get install -y bash
+
+# Set bash as the default shell
+SHELL ["/bin/bash", "-c"]
+
 # Set the working directory
 WORKDIR /app
 
@@ -28,4 +34,4 @@ EXPOSE 8000
 ENV PATH="/usr/lib/chromium-browser/:${PATH}"
 
 # Set the default command to run your application
-CMD ["sh", "-c", "source /app/venv/bin/activate && exec python deploy_api.py"]
+CMD ["sh", "-c", ". /app/venv/bin/activate && exec python deploy_api.py"]
