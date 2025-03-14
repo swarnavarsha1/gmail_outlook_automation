@@ -7,6 +7,8 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from .structure_outputs import *
 from .prompts import *
 from config import config_manager
+import os
+import re
 
 class Agents():
     def __init__(self):
@@ -29,9 +31,21 @@ class Agents():
         vectorstore = Chroma(persist_directory="db", embedding_function=embeddings)
         retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
-        # The rest of your agent initialization code remains the same
+        # Load custom prompts from text file, if available
+        custom_prompts = self._load_custom_prompts()
+        
+        # Use either custom prompts or default prompts
+        categorize_email_prompt_text = custom_prompts.get('CATEGORIZE_EMAIL_PROMPT', CATEGORIZE_EMAIL_PROMPT)
+        generate_rag_queries_prompt_text = custom_prompts.get('GENERATE_RAG_QUERIES_PROMPT', GENERATE_RAG_QUERIES_PROMPT)
+        generate_rag_answer_prompt_text = custom_prompts.get('GENERATE_RAG_ANSWER_PROMPT', GENERATE_RAG_ANSWER_PROMPT)
+        email_writer_prompt_text = custom_prompts.get('EMAIL_WRITER_PROMPT', EMAIL_WRITER_PROMPT)
+        email_proofreader_prompt_text = custom_prompts.get('EMAIL_PROOFREADER_PROMPT', EMAIL_PROOFREADER_PROMPT)
+        identify_samsara_query_prompt_text = custom_prompts.get('IDENTIFY_SAMSARA_QUERY_PROMPT', IDENTIFY_SAMSARA_QUERY_PROMPT)
+        generate_samsara_response_prompt_text = custom_prompts.get('GENERATE_SAMSARA_RESPONSE_PROMPT', GENERATE_SAMSARA_RESPONSE_PROMPT)
+
+        # The rest of your agent initialization code using the prompt texts
         email_category_prompt = PromptTemplate(
-            template=CATEGORIZE_EMAIL_PROMPT, 
+            template=categorize_email_prompt_text, 
             input_variables=["email"]
         )
         self.categorize_email = (
@@ -40,7 +54,7 @@ class Agents():
         )
 
         generate_query_prompt = PromptTemplate(
-            template=GENERATE_RAG_QUERIES_PROMPT, 
+            template=generate_rag_queries_prompt_text, 
             input_variables=["email"]
         )
         self.design_rag_queries = (
@@ -48,7 +62,7 @@ class Agents():
             gemini.with_structured_output(RAGQueriesOutput)
         )
         
-        qa_prompt = ChatPromptTemplate.from_template(GENERATE_RAG_ANSWER_PROMPT)
+        qa_prompt = ChatPromptTemplate.from_template(generate_rag_answer_prompt_text)
         self.generate_rag_answer = (
             {"context": retriever, "question": RunnablePassthrough()}
             | qa_prompt
@@ -57,7 +71,7 @@ class Agents():
         )
 
         writer_prompt = ChatPromptTemplate.from_messages([
-            ("system", EMAIL_WRITER_PROMPT),
+            ("system", email_writer_prompt_text),
             MessagesPlaceholder("history"),
             ("human", "{email_information}")
         ])
@@ -67,7 +81,7 @@ class Agents():
         )
 
         proofreader_prompt = PromptTemplate(
-            template=EMAIL_PROOFREADER_PROMPT, 
+            template=email_proofreader_prompt_text, 
             input_variables=["initial_email", "generated_email"]
         )
         self.email_proofreader = (
@@ -76,7 +90,7 @@ class Agents():
         )
 
         samsara_query_prompt = PromptTemplate(
-            template=IDENTIFY_SAMSARA_QUERY_PROMPT, 
+            template=identify_samsara_query_prompt_text, 
             input_variables=["email"]
         )
         self.identify_samsara_query = (
@@ -85,7 +99,7 @@ class Agents():
         )
         
         samsara_response_prompt = PromptTemplate(
-            template=GENERATE_SAMSARA_RESPONSE_PROMPT,
+            template=generate_samsara_response_prompt_text,
             input_variables=["original_query", "query_type", "samsara_data"]
         )
         self.generate_samsara_response = (
@@ -93,3 +107,43 @@ class Agents():
             gemini | 
             StrOutputParser()
         )
+        
+    def _load_custom_prompts(self):
+        """
+        Load custom prompts from text file.
+        The file should have sections for each prompt, with format:
+        
+        # PROMPT_NAME
+        prompt content...
+        prompt content...
+        
+        # NEXT_PROMPT_NAME
+        next prompt content...
+        """
+        custom_prompts = {}
+        custom_prompts_path = "prompts/custom_prompts.py"
+        
+        if not os.path.exists(custom_prompts_path):
+            print("No custom prompts file found. Using defaults.")
+            return custom_prompts
+            
+        try:
+            with open(custom_prompts_path, 'r') as file:
+                content = file.read()
+                
+            # Split by sections (starting with # PROMPT_NAME)
+            sections = re.split(r'#\s+([A-Z_]+)', content)[1:]  # Skip first empty section
+            
+            # Process sections in pairs (name, content)
+            for i in range(0, len(sections), 2):
+                if i + 1 < len(sections):
+                    prompt_name = sections[i].strip()
+                    prompt_content = sections[i + 1].strip()
+                    custom_prompts[prompt_name] = prompt_content
+            
+            print(f"Loaded {len(custom_prompts)} custom prompts")
+            return custom_prompts
+            
+        except Exception as e:
+            print(f"Error loading custom prompts: {e}")
+            return {}

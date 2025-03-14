@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Search, Loader2, Inbox } from 'lucide-react';
+import { Mail, Search, Loader2, Inbox, FileText } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -183,6 +183,42 @@ const EmailSidebar: React.FC<EmailSidebarProps> = ({ onAccountChange }) => {
     }
   };
 
+  const handlePromptsUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Only accept .txt files
+    if (!file.name.endsWith('.txt')) {
+      addToast('Only .txt files are allowed', 'error');
+      return;
+    }
+    
+    // Create FormData object
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await fetch(`${API_URL}/api/upload-prompts`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to upload prompts');
+      }
+      
+      const result = await response.json();
+      addToast('Custom prompts uploaded successfully', 'success');
+      
+      // Reset the input
+      e.target.value = '';
+    } catch (error: any) {
+      console.error('Error uploading prompts:', error);
+      addToast(error.message || 'Failed to upload prompts', 'error');
+    }
+  };
+
   return (
     <div className="w-72 bg-white h-screen border-r border-gray-200">
       <div className="flex items-center space-x-2 px-4 h-16 border-b border-gray-200">
@@ -315,6 +351,30 @@ const EmailSidebar: React.FC<EmailSidebarProps> = ({ onAccountChange }) => {
             </Button>
           </div>
         </div>
+        <div className="pt-4 border-t border-gray-200">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
+          PROMPT MANAGEMENT
+        </h2>
+        <div className="space-y-4">
+          <div className="text-sm mb-2">Upload custom prompts file:</div>
+          
+          <label className="flex items-center justify-center w-full p-4 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+            <input
+              type="file"
+              accept=".txt"
+              className="hidden"
+              onChange={handlePromptsUpload}
+            />
+            <div className="flex flex-col items-center space-y-2">
+              <FileText className="h-8 w-8 text-gray-400" />
+              <div className="text-xs text-gray-500 text-center">
+                <p>Click to upload a custom prompts file</p>
+                <p className="text-xs opacity-75">(.txt file containing all prompts)</p>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
       </div>
     </div>
   );

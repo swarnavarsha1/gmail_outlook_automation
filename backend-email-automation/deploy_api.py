@@ -1,7 +1,8 @@
 import asyncio
 import io
+import os
 from typing import Optional
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from config import config_manager
 from src.graph import Workflow
@@ -11,6 +12,9 @@ from datetime import datetime, timedelta
 from enum import Enum
 import logging
 import re
+import shutil
+
+os.makedirs("prompts", exist_ok=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -500,6 +504,34 @@ async def check_emails(
             status_code=500, 
             detail=f"Error checking emails: {str(e)}"
         )
+
+@app.post("/api/upload-prompts")
+async def upload_prompts(
+    file: UploadFile = File(...)
+):
+    """
+    Upload a single file containing all custom prompts
+    """
+    try:
+        # Validate file extension
+        if not file.filename.endswith('.txt'):
+            raise HTTPException(status_code=400, detail="Only .txt files are allowed")
+            
+        # Define target path for the uploaded file
+        file_path = "prompts/custom_prompts.txt"
+        
+        # Save the uploaded file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        return {
+            "status": "success",
+            "message": "Custom prompts uploaded successfully",
+            "file_path": file_path
+        }
+    except Exception as e:
+        logger.error(f"Error uploading prompts: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
