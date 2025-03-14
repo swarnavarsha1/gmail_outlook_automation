@@ -5,6 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SimplifiedTimeframeSelector } from "@/components/ui/simplified-timeframe";
 import { useToast } from "@/components/ui/toast-context";
+import { 
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 
 interface Account {
   email: string;
@@ -352,29 +360,29 @@ const EmailSidebar: React.FC<EmailSidebarProps> = ({ onAccountChange }) => {
           </div>
         </div>
         <div className="pt-4 border-t border-gray-200">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
-          PROMPT MANAGEMENT
-        </h2>
-        <div className="space-y-4">
-          <div className="text-sm mb-2">Upload custom prompts file:</div>
-          
-          <label className="flex items-center justify-center w-full p-4 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
-            <input
-              type="file"
-              accept=".txt"
-              className="hidden"
-              onChange={handlePromptsUpload}
-            />
-            <div className="flex flex-col items-center space-y-2">
-              <FileText className="h-8 w-8 text-gray-400" />
-              <div className="text-xs text-gray-500 text-center">
-                <p>Click to upload a custom prompts file</p>
-                <p className="text-xs opacity-75">(.txt file containing all prompts)</p>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            PROMPT MANAGEMENT
+          </h2>
+          <div className="space-y-4">
+            <div className="text-sm mb-2">Upload custom prompts file:</div>
+            
+            <label className="flex items-center justify-center w-full p-4 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+              <input
+                type="file"
+                accept=".txt"
+                className="hidden"
+                onChange={handlePromptsUpload}
+              />
+              <div className="flex flex-col items-center space-y-2">
+                <FileText className="h-8 w-8 text-gray-400" />
+                <div className="text-xs text-gray-500 text-center">
+                  <p>Click to upload a custom prompts file</p>
+                  <p className="text-xs opacity-75">(.txt file containing all prompts)</p>
+                </div>
               </div>
-            </div>
-          </label>
+            </label>
+          </div>
         </div>
-      </div>
       </div>
     </div>
   );

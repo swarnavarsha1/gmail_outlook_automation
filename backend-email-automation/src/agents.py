@@ -121,7 +121,7 @@ class Agents():
         next prompt content...
         """
         custom_prompts = {}
-        custom_prompts_path = "prompts/custom_prompts.py"
+        custom_prompts_path = "prompts/custom_prompts.txt"
         
         if not os.path.exists(custom_prompts_path):
             print("No custom prompts file found. Using defaults.")
