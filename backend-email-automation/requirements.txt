@@ -21,3 +21,4 @@ msal
 aiosmtplib 
 aioimaplib
 dnspython
+python-multipart

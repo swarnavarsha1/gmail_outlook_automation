@@ -13,8 +13,6 @@ services:
 #      - ./backend-email-automation/token_darshan_wadekar04_gmail_com.json:/app/token_darshan_wadekar04_gmail_com.json  # Mounts local backend folder
     environment:
       - PYTHONUNBUFFERED=1
-#    depends_on:
-#      - frontend
     networks:
       - mynetwork
     command: ["/app/venv/bin/python", "deploy_api.py"]
