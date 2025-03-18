@@ -6,9 +6,9 @@
         "email": "info@techoffice.cloud"
     },
     "gmail": {
-        "email": "darshan.wadekar04@gmail.com",
+        "email": "meethadoop11@gmail.com",
         "credentials_file": "credentials.json",
-        "user_email": "darshan.wadekar04@gmail.com"
+        "user_email": "meethadoop11@gmail.com"
     },
     "ai": {
         "gemini_api_key": "AIzaSyDrCCq0WK98Hhi062yMFs41Afi9YEgPXtw"

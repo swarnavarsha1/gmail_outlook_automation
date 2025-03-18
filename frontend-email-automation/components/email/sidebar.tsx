@@ -42,7 +42,8 @@ const EmailSidebar: React.FC<EmailSidebarProps> = ({ onAccountChange }) => {
   const [timeUnit, setTimeUnit] = useState<'hours' | 'days'>('hours');
   const [isCheckingGmail, setIsCheckingGmail] = useState(false);
   const [isCheckingOutlook, setIsCheckingOutlook] = useState(false);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  //const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://techoffice.ddns.net:8000";
   // Replace notification state with useToast hook
   const { addToast } = useToast();
   console.log("API_URL is:", API_URL);

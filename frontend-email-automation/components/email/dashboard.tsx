@@ -3,7 +3,8 @@ import { Mail, CheckCircle, AlertCircle, Send, MessageSquare } from 'lucide-reac
 import { Card, CardContent } from '@/components/ui/card';
 import { TimeframeSelector } from '@/components/ui/timeframe-selector';
 import RecentEmails  from '@/components/ui/recent-emails';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+//const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://techoffice.ddns.net:8000";
 interface EmailStats {
   total: number;
   read: number;
