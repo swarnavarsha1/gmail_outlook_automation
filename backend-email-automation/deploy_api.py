@@ -2,7 +2,7 @@ import asyncio
 import io
 import os
 from typing import Optional
-from fastapi import FastAPI, Query, HTTPException, UploadFile, File
+from fastapi import FastAPI, Query, HTTPException, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 from config import config_manager
 from src.graph import Workflow
@@ -36,9 +36,9 @@ app = FastAPI(
 # Set all CORS enabled origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://techoffice.ddns.net", "http://localhost"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
@@ -79,6 +79,18 @@ class EmailToolFactory:
         except Exception as e:
             logger.error(f"Error creating email tool: {str(e)}")
             raise HTTPException(status_code=400, detail=str(e))
+
+@app.options("/{path:path}")
+async def options_handler():
+    return Response(status_code=200)
+    # return Response(
+    #     status_code=200,
+    #     headers={
+    #         "Access-Control-Allow-Origin": "http://techoffice.ddns.net",  # Replace with your frontend URL
+    #         "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, DELETE",
+    #         "Access-Control-Allow-Headers": "*"
+    #     }
+    # )
 
 @app.get("/api/email-stats")
 async def get_email_stats(
